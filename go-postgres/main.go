@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -25,14 +27,28 @@ type Todo struct {
 	Updated_At time.Time `gorm:"autoUpdateTime"`
 }
 
-//Constants for connection
-const (
-	Host     = "localhost"
-	User     = "postgres"
-	Password = "Neon@2023"
-	Name     = "mydb"
-	Port     = "5432"
-)
+//Database connection settings are read from the environment (see .env.example).
+//A .env file in the working directory is loaded if present; real deployments
+//should set the variables directly and never commit a .env file.
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func dbConfig() (host, user, password, name, port string) {
+	_ = godotenv.Load()
+	host = envOr("DB_HOST", "localhost")
+	user = envOr("DB_USER", "postgres")
+	name = envOr("DB_NAME", "mydb")
+	port = envOr("DB_PORT", "5432")
+	password = os.Getenv("DB_PASSWORD")
+	if password == "" {
+		log.Fatal("DB_PASSWORD is not set; copy .env.example to .env or export it")
+	}
+	return
+}
 
 var todo = Todo{
 	Desc:   "Task1",
@@ -51,7 +67,8 @@ var err error
 func main() {
 
 	//Connecting with database server
-	dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s port=%s", Host, User, Name, Password, Port)
+	host, user, password, name, port := dbConfig()
+	dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s port=%s", host, user, name, password, port)
 	db, err = gorm.Open(postgres.Open(dbURI), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err)
